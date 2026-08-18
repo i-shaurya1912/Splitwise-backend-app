@@ -53,4 +53,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const authMiddleware = require('../middleware/auth');
+
+// Test protected route
+router.get('/me', authMiddleware, async (req, res) => {
+  res.json({ message: 'You are authenticated!', userId: req.userId });
+});
+
 module.exports = router;

@@ -12,6 +12,8 @@ app.use(express.json());   // request body ko JSON me parse karega
 // Routes (baad me add karenge)
 app.use('/api/auth', require('./routes/auth'));
 
+console.log('MONGO_URI is:', process.env.MONGO_URI);
+
 // MongoDB connect
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected ✅'))
