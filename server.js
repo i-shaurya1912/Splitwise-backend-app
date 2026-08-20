@@ -36,6 +36,8 @@ app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/expenses', require('./routes/expenses'));
+app.use('/api/payments', require('./routes/payments'));
+
 
 // Centralized error handler
 app.use((err, req, res, next) => {

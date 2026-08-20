@@ -7,7 +7,7 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// CREATE expense with equal split
+// CREATE expense with equal or custom split
 router.post(
   '/',
   authMiddleware,
@@ -15,6 +15,7 @@ router.post(
     body('description').trim().notEmpty().withMessage('Description is required'),
     body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number'),
     body('groupId').isMongoId().withMessage('Invalid group ID'),
+    body('splitAmong').optional().isArray().withMessage('splitAmong must be an array'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -23,7 +24,7 @@ router.post(
     }
 
     try {
-      const { description, amount, groupId } = req.body;
+      const { description, amount, groupId, splitAmong } = req.body;
 
       const group = await Group.findById(groupId);
       if (!group) {
@@ -34,10 +35,18 @@ router.post(
         return res.status(403).json({ message: 'You are not a member of this group' });
       }
 
-      const numMembers = group.members.length;
+      const groupMemberIds = group.members.map((id) => id.toString());
+      let selectedMembers = splitAmong && splitAmong.length > 0 ? splitAmong : groupMemberIds;
+
+      const invalidMember = selectedMembers.find((id) => !groupMemberIds.includes(id));
+      if (invalidMember) {
+        return res.status(400).json({ message: 'One or more selected members are not in this group' });
+      }
+
+      const numMembers = selectedMembers.length;
       const splitAmount = amount / numMembers;
 
-      const splitBetween = group.members.map((memberId) => ({
+      const splitBetween = selectedMembers.map((memberId) => ({
         user: memberId,
         amount: parseFloat(splitAmount.toFixed(2)),
       }));
@@ -170,7 +179,9 @@ router.get('/group/:groupId/settlements', authMiddleware, async (req, res) => {
 
       settlements.push({
         from: debtor.name,
+        fromUserId: debtor.userId,
         to: creditor.name,
+        toUserId: creditor.userId,
         amount: parseFloat(settleAmount.toFixed(2)),
       });
 
