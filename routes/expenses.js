@@ -8,6 +8,7 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 // CREATE expense with equal or custom split
+// CREATE expense with equal or custom split, and selectable payer
 router.post(
   '/',
   authMiddleware,
@@ -16,6 +17,7 @@ router.post(
     body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number'),
     body('groupId').isMongoId().withMessage('Invalid group ID'),
     body('splitAmong').optional().isArray().withMessage('splitAmong must be an array'),
+    body('paidBy').optional().isMongoId().withMessage('Invalid payer'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -24,7 +26,7 @@ router.post(
     }
 
     try {
-      const { description, amount, groupId, splitAmong } = req.body;
+      const { description, amount, groupId, splitAmong, paidBy } = req.body;
 
       const group = await Group.findById(groupId);
       if (!group) {
@@ -36,6 +38,10 @@ router.post(
       }
 
       const groupMemberIds = group.members.map((id) => id.toString());
+
+      // Kisne paisa diya — agar specify nahi kiya, toh current user (default behavior)
+      const actualPayer = paidBy && groupMemberIds.includes(paidBy) ? paidBy : req.userId;
+
       let selectedMembers = splitAmong && splitAmong.length > 0 ? splitAmong : groupMemberIds;
 
       const invalidMember = selectedMembers.find((id) => !groupMemberIds.includes(id));
@@ -55,7 +61,7 @@ router.post(
         description,
         amount,
         group: groupId,
-        paidBy: req.userId,
+        paidBy: actualPayer,
         splitBetween,
       });
 

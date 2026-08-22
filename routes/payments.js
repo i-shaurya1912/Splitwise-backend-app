@@ -109,12 +109,15 @@ router.post(
   }
 );
 
-// Group ke saare payments dekho
+
+// GET all payments (any status) for a group
 router.get('/group/:groupId', authMiddleware, async (req, res) => {
   try {
-    const payments = await Payment.find({ group: req.params.groupId, status: 'paid' })
+    const payments = await Payment.find({ group: req.params.groupId })
       .populate('from', 'name')
-      .populate('to', 'name');
+      .populate('to', 'name')
+      .sort({ createdAt: -1 }); // newest first
+
     res.status(200).json(payments);
   } catch (err) {
     console.error(err);
