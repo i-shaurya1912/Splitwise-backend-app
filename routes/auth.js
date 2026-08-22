@@ -184,10 +184,6 @@ router.post(
         return res.status(400).json({ message: 'Invalid credentials' });
       }
 
-      if (!user.isVerified) {
-        return res.status(403).json({ message: 'Please verify your email first', needsVerification: true, email: user.email });
-      }
-
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       res.status(200).json({ token, user: { id: user._id, name: user.name, email: user.email } });
