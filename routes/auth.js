@@ -107,7 +107,13 @@ router.post(
       user.otpExpiry = undefined;
       await user.save();
 
-      res.status(200).json({ message: 'Email verified successfully' });
+      const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+      res.status(200).json({ 
+        message: 'Email verified successfully',
+        token,
+        user: { id: user._id, name: user.name, email: user.email }
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: 'Server error' });
