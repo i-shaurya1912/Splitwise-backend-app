@@ -18,12 +18,12 @@ const otpLimiter = rateLimit({
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // SIGNUP — creates unverified user, sends OTP
+// SIGNUP
 router.post(
   '/signup',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-    body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   ],
   async (req, res) => {
@@ -33,35 +33,43 @@ router.post(
     }
 
     try {
-      const { name, email, phone, password } = req.body;
+      const { name, email, password } = req.body;
 
       const existingUser = await User.findOne({ email });
-      if (existingUser) {
+
+      // Agar user pehle se hai LEKIN verify nahi hua — naya OTP bhejo, error mat do
+      if (existingUser && !existingUser.isVerified) {
+        const otp = generateOTP();
+        existingUser.otp = otp;
+        existingUser.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        await existingUser.save();
+
+        // Response TURANT bhejo, email background me jaaye
+        res.status(200).json({ message: 'OTP sent to your email', email: existingUser.email });
+        sendOTPEmail(email, otp).catch((err) => console.error('Email send failed:', err));
+        return;
+      }
+
+      if (existingUser && existingUser.isVerified) {
         return res.status(400).json({ message: 'User already exists' });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const otp = generateOTP();
-      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
       const user = await User.create({
         name,
         email,
-        phone: phone || undefined,
         password: hashedPassword,
         isVerified: false,
         otp,
         otpExpiry,
       });
 
-      try {
-        await sendOTPEmail(email, otp);
-      } catch (emailErr) {
-        console.error('⚠️ Failed to send OTP email via Nodemailer:', emailErr.message);
-        console.log(`🔑 [DEV FALLBACK] Generated OTP for ${email}: ${otp}`);
-      }
-
+      // Response TURANT bhejo — email background me chalta rahega
       res.status(201).json({ message: 'OTP sent to your email', userId: user._id, email: user.email });
+      sendOTPEmail(email, otp).catch((err) => console.error('Email send failed:', err));
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: 'Server error' });

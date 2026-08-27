@@ -3,31 +3,16 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const sanitizeMiddleware = require('./middleware/sanitize');
 require('dotenv').config();
+
+const sanitizeMiddleware = require('./middleware/sanitize');
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL.trim().replace(/\/$/, ''));
-}
-
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const cleanOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-    return callback(null, true);
-  },
-  credentials: true,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
 }));
 app.use(express.json({ limit: '10kb' }));
 app.use(sanitizeMiddleware);
@@ -48,12 +33,16 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 
+// Health check route — cron-job.org isko ping karega taaki Render server sleep na ho
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/payments', require('./routes/payments'));
-
 
 // Centralized error handler
 app.use((err, req, res, next) => {
